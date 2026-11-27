@@ -38,7 +38,7 @@
 
   <!-- Lucide Icons CDN -->
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
   <style>
     body { font-family: 'Noto Sans TC', 'Inter', system-ui, sans-serif; background: #F8F2E7; color: #3B271C; }
@@ -121,7 +121,7 @@
     /* ===== 3D 小狗散步 ===== */
     .dogs { position:absolute; left:0; right:0; bottom:0; height:260px; z-index:5; overflow:hidden; pointer-events:none;
             background:linear-gradient(to top, rgba(217,112,43,.28), transparent); }
-    .dogs::after { content:""; position:absolute; left:0; right:0; bottom:6px; height:2px; background:rgba(248,242,231,.3); }
+    .dogs::after { content:""; position:absolute; left:0; right:0; bottom:0; height:30px; background:linear-gradient(to top, rgba(59,39,28,.85), rgba(59,39,28,0)); border-top:1px solid rgba(248,242,231,.12); }
 
     @media (prefers-reduced-motion: reduce) {
       .reveal { opacity: 1; transform: none; transition: none; }
@@ -192,9 +192,14 @@
 
     <!-- ===================== HERO ===================== -->
     <section class="relative flex min-h-[100svh] items-center overflow-hidden bg-wood" aria-label="主視覺">
-      <div class="absolute inset-0 bg-gradient-to-br from-wood via-wood-700 to-wood"></div>
+      <div class="img-wrap absolute inset-0">
+        <img src="https://images.unsplash.com/photo-1541696432-82c6da8ce7bf?auto=format&fit=crop&w=2000&q=80"
+             alt="剛起鍋、底部金黃酥脆的鍋貼" class="h-full w-full object-cover" fetchpriority="high" onerror="imgFallback(this)" />
+      </div>
+      <div class="absolute inset-0 bg-gradient-to-r from-wood via-wood/85 to-wood/30"></div>
+      <div class="absolute inset-0 bg-gradient-to-t from-wood via-transparent to-wood/60"></div>
 
-      <div class="relative z-10 mx-auto w-full max-w-7xl px-5 pb-[17rem] pt-32 md:px-8 md:pb-[16rem]">
+      <div class="relative z-10 mx-auto w-full max-w-7xl px-5 pb-[15rem] pt-24 md:px-8 md:pb-[16rem] md:pt-32">
         <div class="max-w-2xl">
           <p class="reveal mb-6 inline-flex items-center gap-2 rounded-full border border-cream/25 px-4 py-1.5 text-xs tracking-[.3em] text-cream/90">
             <span class="h-1.5 w-1.5 rounded-full bg-ember"></span> 每日現包 · 現點現煎
@@ -202,10 +207,10 @@
           <h1 class="reveal font-serif text-[42px] font-bold leading-[1.15] text-cream sm:text-6xl lg:text-7xl">
             金黃酥脆，<br /><span class="text-ember">傳承手藝</span>的<br class="sm:hidden" />極致美味
           </h1>
-          <p class="reveal mt-7 max-w-lg text-base leading-relaxed text-cream/80 sm:text-lg">
+          <p class="reveal mt-5 max-w-lg text-base leading-relaxed text-cream/80 sm:mt-7 sm:text-lg">
             三十年老師傅的手勁，一張薄皮、一口爆汁。用台灣在地溫體豬，配上黃金煎脆比例，把最樸實的家常味煎成值得專程來吃的一盤。
           </p>
-          <div class="reveal mt-10 flex flex-col gap-3 sm:flex-row sm:gap-4">
+          <div class="reveal mt-8 flex flex-col gap-3 sm:mt-10 sm:flex-row sm:gap-4">
             <a href="#menu" class="inline-flex items-center justify-center gap-2 rounded-full bg-ember px-8 py-4 font-semibold tracking-wider text-white shadow-lift transition hover:-translate-y-0.5 hover:bg-ember-600">
               <i data-lucide="utensils" class="h-5 w-5"></i> 線上點餐
             </a>
@@ -213,10 +218,15 @@
               <i data-lucide="map-pin" class="h-5 w-5"></i> 探索門市
             </a>
           </div>
+          <ul class="reveal mt-10 hidden flex-wrap sm:flex gap-x-7 gap-y-3 text-sm text-cream/85">
+            <li class="inline-flex items-center gap-2"><i data-lucide="flame" class="h-4 w-4 text-ember"></i> 現點現煎</li>
+            <li class="inline-flex items-center gap-2"><i data-lucide="leaf" class="h-4 w-4 text-ember"></i> 台灣溫體豬</li>
+            <li class="inline-flex items-center gap-2"><i data-lucide="chef-hat" class="h-4 w-4 text-ember"></i> 三十年老師傅手藝</li>
+          </ul>
         </div>
       </div>
 
-      <!-- 3D 小劇場：小狗與可達鴨走進鍋貼店（Three.js） -->
+      <!-- 3D 小劇場：小狗與可達鴨排隊走進鍋貼店（Three.js） -->
       <div id="dogs" class="dogs" aria-hidden="true"></div>
 
     </section>
@@ -1669,7 +1679,7 @@
         camera.updateProjectionMatrix();
         const vis = Math.tan((16 * Math.PI) / 180) * 7.5 * camera.aspect;
         halfW = vis + 2.5;
-        doorX = Math.max(1.6, vis * 0.6);
+        doorX = small ? -vis * 0.15 : Math.max(1.6, vis * 0.5);
         shop.position.x = doorX;
         shop.scale.setScalar(small ? 0.8 : 1.12);
         cast.forEach((d) => { if (d.state === 'inside' || d.state === 'exitWait') d.g.position.x = doorX; });
