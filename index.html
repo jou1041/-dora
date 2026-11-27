@@ -144,10 +144,10 @@
     @media (prefers-reduced-motion: reduce) { .ember-dot, .hero-glow, .lantern { animation:none !important; } .ember-dot { display:none; } }
 
     /* ===== 3D 小狗散步 ===== */
-    .dogs { position:absolute; left:0; right:0; bottom:0; height:280px; z-index:5; overflow:hidden; pointer-events:none;
+    .dogs { position:absolute; left:0; right:0; bottom:0; height:300px; z-index:5; overflow:hidden; pointer-events:none;
             background:linear-gradient(to top, rgba(217,112,43,.28), transparent); }
     .dogs::after { content:""; position:absolute; left:0; right:0; bottom:0; height:30px; background:linear-gradient(to top, rgba(59,39,28,.85), rgba(59,39,28,0)); border-top:1px solid rgba(248,242,231,.12); }
-    @media (min-width:768px) { .dogs { height:330px; } }
+    @media (min-width:768px) { .dogs { height:390px; } }
 
     @media (prefers-reduced-motion: reduce) {
       .reveal { opacity: 1; transform: none; transition: none; }
@@ -1496,9 +1496,9 @@
       renderer.domElement.style.cssText = 'display:block;width:100%;height:100%';
 
       const scene = new T.Scene();
-      const camera = new T.PerspectiveCamera(36, 1, 0.1, 100);
+      const camera = new T.PerspectiveCamera(44, 1, 0.1, 100);
       camera.position.set(0, 2.5, 7.5);
-      camera.lookAt(0, 1.65, 0);
+      camera.lookAt(0, 2.05, 0);
       scene.add(new T.AmbientLight(0xffffff, 0.8));
       const sun = new T.DirectionalLight(0xffffff, 0.8);
       sun.position.set(3, 6, 5);
@@ -1750,11 +1750,64 @@
         return { g, body, head, legs, sign: [1, -1], tail, bodyY: 0.62, headY: 1.28, wag: 0, sway: true, scale: 1 };
       }
 
+      // 蕾潔（電影海報人物）的 Q 版：深藍紫短髮＋後方小髮髻、綠眼睛、黑項圈與領帶、白色無袖襯衫
+      function makeReze() {
+        const skin = mat(0xffe1cf), hair = mat(0x2b2542), shirt = mat(0xfafafa), black = mat(0x1b1824), green = mat(0x58c98f);
+        const g = new T.Group();
+        const body = new T.Group();
+        body.add(part(sph, shirt, 0, 0.92, 0, 0.36, 0.46, 0.3));          // 襯衫
+        body.add(part(sph, black, 0, 0.55, 0, 0.44, 0.2, 0.36));          // 黑色短裙
+        const choker = new T.Mesh(new T.TorusGeometry(0.17, 0.035, 8, 20), black);
+        choker.rotation.x = Math.PI / 2; choker.position.set(0.02, 1.27, 0);
+        body.add(choker);
+        [0.1, -0.1].forEach((z, i) => { const c = part(sph, shirt, 0.12, 1.2, z, 0.1, 0.06, 0.1); c.rotation.x = i ? 0.5 : -0.5; body.add(c); });
+        body.add(part(sph, black, 0.27, 1.05, 0, 0.04, 0.16, 0.05));      // 黑色領帶／緞帶
+        body.add(part(sph, black, 0.27, 1.2, 0, 0.05, 0.05, 0.07));
+        g.add(body);
+
+        const head = new T.Group();
+        head.position.set(0.02, 1.62, 0);
+        head.add(part(sph, skin, 0, 0, 0, 0.55, 0.5, 0.5));
+        head.add(part(sph, hair, -0.08, 0.06, 0, 0.58, 0.54, 0.56));      // 後腦與頭頂的頭髮
+        head.add(part(sph, hair, 0.14, 0.34, 0, 0.42, 0.2, 0.52));        // 瀏海
+        [0.4, -0.4].forEach((z) => head.add(part(sph, hair, 0.18, -0.02, z, 0.2, 0.36, 0.13)));  // 兩側髮絲
+        head.add(part(sph, hair, 0.3, 0.14, 0.24, 0.16, 0.26, 0.1));      // 垂在臉前的一綹
+        head.add(part(sph, hair, -0.34, 0.5, -0.28, 0.2));                // 後方小髮髻
+        [0.25, -0.25].forEach((z) => {
+          head.add(part(sph, green, 0.47, 0.0, z, 0.1, 0.14, 0.1));
+          head.add(part(sph, dark, 0.55, 0.0, z, 0.045, 0.08, 0.05));
+          head.add(part(sph, white, 0.56, 0.06, z * 0.96, 0.03));
+        });
+        addBlush(head, 0.46, -0.14, 0.36);
+        head.add(part(sph, mat(0xd9756e), 0.5, -0.24, 0, 0.03, 0.018, 0.09));   // 淡淡的微笑
+        g.add(head);
+
+        const legs = [];
+        [[0.16, 0.5, skin, 0.5, 0.1], [-0.16, 0.5, skin, 0.5, 0.1]].forEach(([z, y, m, len, r]) => {
+          const pv = new T.Group();
+          pv.position.set(0, y, z);
+          pv.add(part(cyl, m, 0, -len / 2, 0, r, len, r));
+          pv.add(part(sph, black, 0.07, -len, 0, 0.17, 0.08, 0.12));
+          g.add(pv);
+          legs.push(pv);
+        });
+        [0.4, -0.4].forEach((z) => {
+          const pv = new T.Group();
+          pv.position.set(0, 1.18, z);
+          pv.add(part(cyl, skin, 0, -0.26, 0, 0.075, 0.5, 0.075));
+          pv.add(part(sph, skin, 0, -0.54, 0, 0.1));
+          g.add(pv);
+          legs.push(pv);
+        });
+        addShadow(g, 0.9);
+        return { g, body, head, legs, sign: DOG_SIGN, tail: new T.Group(), bodyY: 0, headY: 1.62, wag: 0, scale: 0.92 };
+      }
+
       /* ---------- 角色與劇情 ---------- */
       let H = host.clientHeight || 300;
       let halfW = 12, doorX = 8;
       const small = window.innerWidth < 640;
-      const makers = small ? [makeShiba, makePsyduck, makeCorgi, makePsyduck] : [makeShiba, makePsyduck, makeCorgi, makeShiba, makePsyduck, makeCorgi];
+      const makers = small ? [makeShiba, makeReze, makeCorgi, makePsyduck] : [makeShiba, makeReze, makeCorgi, makePsyduck, makeShiba, makeReze, makeCorgi];
       const cast = [];
       makers.forEach((mk, i) => {
         const d = mk();
@@ -1762,7 +1815,7 @@
         d.phase = Math.random() * 6.28;
         d.laneIn = 0.5 + Math.random() * 0.6;
         d.laneOut = 0.0 + Math.random() * 0.4;
-        d.g.scale.setScalar((small ? 0.78 : 0.95) * d.scale);
+        d.g.scale.setScalar((small ? 0.85 : 1.05) * d.scale);
         d.i = i;
         // 內層群組：讓角色走路時身體微微轉向鏡頭，看得到側臉與大眼睛
         d.inner = new T.Group();
@@ -1774,7 +1827,7 @@
 
       const place = (d, state, x, z, rot, vis) => { d.state = state; d.g.position.set(x, 0, z); d.g.rotation.y = rot; d.g.visible = vis; d.moving = false; };
       const QLANE = 1.15, ELANE = 0.4;      // 排隊走道（靠近鏡頭）、走出店門後的走道（較遠）
-      const GAP = () => (small ? 2.1 : 2.6); // 排隊時前後間距
+      const GAP = () => (small ? 2.2 : 2.8); // 排隊時前後間距
       let gate = null;                       // 店門同一時間只讓一位角色進出
       function seed() {
         const nQ = Math.floor(cast.length / 2);
@@ -1792,11 +1845,11 @@
         renderer.setSize(w, H, false);
         camera.aspect = w / H;
         camera.updateProjectionMatrix();
-        const vis = Math.tan((18 * Math.PI) / 180) * 7.5 * camera.aspect;
+        const vis = Math.tan((22 * Math.PI) / 180) * 7.5 * camera.aspect;
         halfW = vis + 2.5;
-        doorX = small ? -vis * 0.25 : Math.max(2.2, vis * 0.45);
+        doorX = small ? -vis * 0.25 : Math.max(2.2, vis * 0.4);
         shop.position.x = doorX;
-        const S = small ? 0.95 : 1.4;
+        const S = small ? 1.1 : 1.75;
         shop.scale.setScalar(S);
         shop.position.z = -DOOR_Z * (S - 1);
         cast.forEach((d) => { if (d.state === 'inside' || d.state === 'exitWait') d.g.position.x = doorX; });
