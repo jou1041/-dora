@@ -1,5 +1,5 @@
 /* 煎和鍋貼所 Service Worker：離線可開啟、更新時自動換新版 */
-const VERSION = 'jianhe-v1';
+const VERSION = 'jianhe-v2';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/apple-touch-icon.png'];
 
 self.addEventListener('install', (e) => {
@@ -17,6 +17,8 @@ self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
+  // 訂單 API（Google Apps Script）一律不快取、不攔截
+  if (/(^|\.)script\.google\.com$|(^|\.)googleusercontent\.com$/.test(url.hostname)) return;
 
   // 頁面：先連網路（拿到最新版），失敗時用快取，確保離線也打得開
   if (req.mode === 'navigate') {

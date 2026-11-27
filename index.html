@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>煎和鍋貼所 JIANHE｜金黃酥脆，傳承手藝的極致美味</title>
   <meta name="description" content="煎和鍋貼所：台灣在地豬肉、每日現包、黃金煎脆比例。線上點餐、冷凍禮盒宅配、門市據點資訊。" />
+  <!-- 訂單串接設定：部署 Google Apps Script 後，把「網頁應用程式網址」貼到 orderApi（留空＝示範模式，不會送到試算表） -->
+  <script>window.JIANHE_CONFIG = window.JIANHE_CONFIG || { orderApi: '' };</script>
+
   <!-- PWA -->
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#3B271C" />
@@ -589,6 +592,10 @@
         </div>
 
         <form id="checkoutForm" class="flex-1 overflow-y-auto px-6 py-6 thin-scroll" novalidate>
+          <!-- 防機器人欄位：真人看不到也不會填 -->
+          <div style="position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden" aria-hidden="true">
+            <label>網站 <input id="cWebsite" name="website" type="text" tabindex="-1" autocomplete="off" /></label>
+          </div>
           <!-- 取餐方式 -->
           <fieldset>
             <legend class="text-sm font-bold">取餐方式</legend>
@@ -1060,6 +1067,7 @@
        ========================================================= */
     const ORDER_TYPES = { dinein: '內用', takeout: '外帶', delivery: '冷凍宅配' };
     const SHIPPING_FEE = 150, FREE_SHIP = 1500;
+    const ORDER_API = (window.JIANHE_CONFIG && window.JIANHE_CONFIG.orderApi) || '';
 
     const currentType = () => $('input[name="orderType"]:checked').value;
     const shippingFee = () => currentType() === 'delivery' && cartSubtotal() < FREE_SHIP ? SHIPPING_FEE : 0;
@@ -1116,6 +1124,9 @@
       $('#sumTotal').textContent = money(sub + ship);
     }
 
+    let checkoutToken = '', tokenSig = '';
+    const newToken = () => (window.crypto && crypto.randomUUID ? crypto.randomUUID().replace(/-/g, '') : (Date.now().toString(36) + Math.random().toString(36).slice(2, 12)));
+
     function openCheckout() {
       if (!cart.length) return showToast('購物車是空的喔', 'error');
       closeCart();
@@ -1167,42 +1178,100 @@
       return ok;
     }
 
-    function submitOrder(e) {
+    /* 組出要送到 Google Apps Script 的訂單資料（金額僅供參考，伺服器會用商品表重新計價） */
+    function buildOrderPayload() {
+      const type = currentType();
+      // 同一份訂單內容重送時沿用同一個代碼（伺服器據此去重）；內容改變就換新代碼
+      const sig = JSON.stringify([type, $('#cPhone').value, cart.map(l => [l.id, l.qty])]);
+      if (!checkoutToken || sig !== tokenSig) { checkoutToken = newToken(); tokenSig = sig; }
+      return {
+        clientToken: checkoutToken,
+        orderType: type,
+        name: $('#cName').value.trim(),
+        phone: $('#cPhone').value.replace(/[\s-]/g, ''),
+        email: $('#cEmail').value.trim(),
+        store: $('#cStore').value,
+        time: $('#cTime').value.replace('最快 ', ''),
+        guests: $('#cGuests') ? $('#cGuests').value : '',
+        address: $('#cAddress').value.trim(),
+        date: $('#cDate').value,
+        note: $('#cNote').value.trim(),
+        pay: $('input[name="pay"]:checked').value,
+        items: cart.map(l => ({ id: l.id, qty: l.qty })),
+        clientTotal: cartSubtotal() + shippingFee(),
+        website: $('#cWebsite').value,
+        source: window.matchMedia('(display-mode: standalone)').matches ? 'pwa' : 'web'
+      };
+    }
+
+    /* 送出到 Google Apps Script；用 text/plain 避免瀏覽器的 CORS 預檢請求 */
+    async function postOrder(payload) {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 25000);
+      try {
+        const res = await fetch(ORDER_API, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(payload), signal: ctrl.signal, redirect: 'follow' });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return await res.json();
+      } finally { clearTimeout(timer); }
+    }
+
+    function showOrderSuccess(orderId, total) {
+      const type = currentType();
+      const store = STORES.find(s => s.id === $('#cStore').value);
+      $('#sucId').textContent = orderId;
+      $('#sucType').textContent = ORDER_TYPES[type];
+      $('#sucWhereLabel').textContent = type === 'delivery' ? '收件地址' : '取餐門市';
+      $('#sucWhere').textContent = type === 'delivery'
+        ? `${$('#cAddress').value.trim()}（${$('#cDate').value} 到貨）`
+        : `${store.name}・${$('#cTime').value.replace('最快 ', '')}`;
+      $('#sucPay').textContent = $('input[name="pay"]:checked').value;
+      $('#sucTotal').textContent = money(total);
+      $('#sucPhone').textContent = $('#cPhone').value;
+
+      $('#checkoutFormView').classList.add('hidden');
+      $('#checkoutFormView').classList.remove('flex');
+      $('#checkoutSuccessView').classList.remove('hidden');
+      refreshIcons();
+
+      clearCart();
+      $('#checkoutForm').reset();
+      checkoutToken = '';
+      showToast('訂單已建立，感謝您的訂購！', 'success');
+    }
+
+    async function submitOrder(e) {
       e.preventDefault();
       if (!validate()) return showToast('請確認標示紅框的欄位', 'error');
       const btn = $('#submitOrder');
+      if (btn.disabled) return;
       btn.disabled = true;
       $('#submitText').innerHTML = '<span class="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white align-[-2px]"></span> 訂單送出中…';
+      const resetBtn = () => { btn.disabled = false; $('#submitText').textContent = '確認送出訂單'; };
 
-      // 模擬 API 請求
-      setTimeout(() => {
-        const type = currentType();
-        const total = cartSubtotal() + shippingFee();
-        const now = new Date();
-        const orderId = 'JH' + now.toISOString().slice(2, 10).replace(/-/g, '') + String(Math.floor(Math.random() * 9000) + 1000);
-        const store = STORES.find(s => s.id === $('#cStore').value);
+      // 尚未設定 Google Apps Script 網址：示範模式（不會寫入試算表）
+      if (!ORDER_API) {
+        setTimeout(() => {
+          const now = new Date();
+          const orderId = 'JH' + now.toISOString().slice(2, 10).replace(/-/g, '') + String(Math.floor(Math.random() * 9000) + 1000);
+          showOrderSuccess(orderId, cartSubtotal() + shippingFee());
+          resetBtn();
+        }, 1200);
+        return;
+      }
 
-        $('#sucId').textContent = orderId;
-        $('#sucType').textContent = ORDER_TYPES[type];
-        $('#sucWhereLabel').textContent = type === 'delivery' ? '收件地址' : '取餐門市';
-        $('#sucWhere').textContent = type === 'delivery'
-          ? `${$('#cAddress').value.trim()}（${$('#cDate').value} 到貨）`
-          : `${store.name}・${$('#cTime').value.replace('最快 ', '')}`;
-        $('#sucPay').textContent = $('input[name="pay"]:checked').value;
-        $('#sucTotal').textContent = money(total);
-        $('#sucPhone').textContent = $('#cPhone').value;
-
-        $('#checkoutFormView').classList.add('hidden');
-        $('#checkoutFormView').classList.remove('flex');
-        $('#checkoutSuccessView').classList.remove('hidden');
-        refreshIcons();
-
-        clearCart();
-        $('#checkoutForm').reset();
-        btn.disabled = false;
-        $('#submitText').textContent = '確認送出訂單';
-        showToast('訂單已建立，感謝您的訂購！', 'success');
-      }, 1200);
+      try {
+        const result = await postOrder(buildOrderPayload());
+        if (result && result.ok) {
+          showOrderSuccess(result.orderId, result.total);
+        } else {
+          showToast((result && result.message) || '訂單送出失敗，請稍後再試。', 'error');
+        }
+      } catch (err) {
+        // 網路中斷或逾時：保留購物車與表單，重按即可重送（同一個 clientToken，不會重複建單）
+        showToast('網路連線不穩，訂單尚未送出，請再按一次「確認送出訂單」。', 'error');
+      } finally {
+        resetBtn();
+      }
     }
 
     /* =========================================================
