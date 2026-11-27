@@ -118,6 +118,31 @@
     .thin-scroll::-webkit-scrollbar-thumb { background: #CDB89A; border-radius: 9px; }
 
 
+    /* ===== 首屏氛圍：暖光、顆粒、飄動火星、燈籠 ===== */
+    .hero-glow { position:absolute; inset:0; pointer-events:none; z-index:1;
+      background:
+        radial-gradient(55% 55% at 72% 80%, rgba(255,170,80,.34), transparent 70%),
+        radial-gradient(40% 45% at 12% 18%, rgba(255,205,130,.14), transparent 70%),
+        radial-gradient(90% 90% at 50% 50%, transparent 55%, rgba(20,10,5,.55) 100%);
+      animation: glowPulse 7s ease-in-out infinite alternate; }
+    @keyframes glowPulse { from { opacity:.75; } to { opacity:1; } }
+    .hero-grain { position:absolute; inset:0; pointer-events:none; z-index:1; opacity:.09; mix-blend-mode:overlay;
+      background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>"); }
+    .embers { position:absolute; inset:0; overflow:hidden; pointer-events:none; z-index:2; }
+    .ember-dot { position:absolute; bottom:-12px; border-radius:50%; background:radial-gradient(circle, rgba(255,214,150,.95), rgba(255,140,60,.55) 55%, transparent 72%);
+      animation: emberRise var(--d,14s) linear var(--delay,0s) infinite; opacity:0; will-change:transform,opacity; }
+    @keyframes emberRise { 0% { transform:translate(0,0); opacity:0; } 12% { opacity:var(--o,.7); } 80% { opacity:calc(var(--o,.7) * .6); } 100% { transform:translate(var(--dx,30px), -110vh); opacity:0; } }
+    .lanterns { position:absolute; top:70px; left:0; right:0; height:90px; pointer-events:none; z-index:2; display:none; }
+    @media (min-width:768px) { .lanterns { display:block; } }
+    .lantern { position:absolute; top:0; transform-origin:50% 0; animation: swing var(--sd,4s) ease-in-out var(--sdelay,0s) infinite alternate; }
+    .lantern i { display:block; width:1px; margin:0 auto; background:rgba(248,242,231,.35); height:var(--len,12px); }
+    .lantern b { display:block; width:20px; height:24px; border-radius:46% 46% 42% 42%; margin-left:-9.5px;
+      background:radial-gradient(circle at 50% 40%, #ff8a5c, #d23a2a 70%); box-shadow:0 0 22px 4px rgba(255,120,60,.45); position:relative; }
+    .lantern b::before, .lantern b::after { content:""; position:absolute; left:50%; width:10px; height:3px; margin-left:-5px; background:#3b271c; border-radius:2px; }
+    .lantern b::before { top:-1px; } .lantern b::after { bottom:-1px; }
+    @keyframes swing { from { transform:rotate(-5deg); } to { transform:rotate(5deg); } }
+    @media (prefers-reduced-motion: reduce) { .ember-dot, .hero-glow, .lantern { animation:none !important; } .ember-dot { display:none; } }
+
     /* ===== 3D 小狗散步 ===== */
     .dogs { position:absolute; left:0; right:0; bottom:0; height:260px; z-index:5; overflow:hidden; pointer-events:none;
             background:linear-gradient(to top, rgba(217,112,43,.28), transparent); }
@@ -198,6 +223,11 @@
       </div>
       <div class="absolute inset-0 bg-gradient-to-r from-wood via-wood/85 to-wood/30"></div>
       <div class="absolute inset-0 bg-gradient-to-t from-wood via-transparent to-wood/60"></div>
+
+      <div class="hero-glow"></div>
+      <div class="hero-grain"></div>
+      <div id="lanterns" class="lanterns" aria-hidden="true"></div>
+      <div id="embers" class="embers" aria-hidden="true"></div>
 
       <div class="relative z-10 mx-auto w-full max-w-7xl px-5 pb-[15rem] pt-24 md:px-8 md:pb-[16rem] md:pt-32">
         <div class="max-w-2xl">
@@ -1424,6 +1454,35 @@
        11. 初始化
        ========================================================= */
 
+    /* 首屏氛圍：飄動的火星 + 左右搖擺的燈籠串 */
+    function initAmbience() {
+      const em = $('#embers'), ln = $('#lanterns');
+      if (em) {
+        const n = window.innerWidth < 640 ? 14 : 26;
+        for (let i = 0; i < n; i++) {
+          const d = document.createElement('span');
+          const size = 3 + Math.random() * 7;
+          d.className = 'ember-dot';
+          d.style.cssText = `left:${(Math.random() * 100).toFixed(1)}%;width:${size.toFixed(1)}px;height:${size.toFixed(1)}px;` +
+            `--d:${(10 + Math.random() * 12).toFixed(1)}s;--delay:${(-Math.random() * 20).toFixed(1)}s;--dx:${(Math.random() * 120 - 60).toFixed(0)}px;--o:${(0.35 + Math.random() * 0.5).toFixed(2)}`;
+          em.appendChild(d);
+        }
+      }
+      if (ln) {
+        const n = 13;
+        for (let i = 0; i < n; i++) {
+          const el = document.createElement('div');
+          el.className = 'lantern';
+          el.style.left = ((i + 0.5) / n * 100).toFixed(2) + '%';
+          el.style.setProperty('--len', (6 + 14 * Math.abs(Math.sin(i * 0.9)) + Math.random() * 4).toFixed(0) + 'px');
+          el.style.setProperty('--sd', (3 + Math.random() * 2).toFixed(1) + 's');
+          el.style.setProperty('--sdelay', (-Math.random() * 4).toFixed(1) + 's');
+          el.innerHTML = '<i></i><b></b>';
+          ln.appendChild(el);
+        }
+      }
+    }
+
     /* 3D 小劇場：柴犬、柯基、可達鴨走進鍋貼店，吃飽後再走出來（Three.js 即時繪製） */
     function initDogs() {
       const host = $('#dogs');
@@ -1513,6 +1572,28 @@
         puffs.push(pf);
       }
       scene.add(shop);
+
+      /* ---------- 街景：地面、路緣、後方店家剪影 ---------- */
+      const ground = part(box, mat(0x4a3226), 0, -0.05, 0, 90, 0.1, 10);
+      scene.add(ground);
+      scene.add(part(box, mat(0x6e4d3a), 0, 0.01, -1.05, 90, 0.04, 0.22));
+      const bg = new T.Group();
+      const tones = [0x2b1c14, 0x33231a, 0x3a291f, 0x2f2018];
+      let bx = -30, bi = 0;
+      while (bx < 30) {
+        const w = 2.2 + ((bi * 37) % 13) / 13 * 1.6, h = 2.4 + ((bi * 53) % 11) / 11 * 2.0;
+        const tone = tones[bi % tones.length];
+        bg.add(part(box, mat(tone), bx + w / 2, h / 2, -4.6, w, h, 1.6));
+        bg.add(part(box, mat(shade(tone, 0.75)), bx + w / 2, h + 0.08, -4.6, w + 0.2, 0.16, 1.8));
+        const cols = Math.max(1, Math.floor(w / 1.0));
+        for (let c = 0; c < cols; c++) for (let r = 0; r < Math.floor((h - 0.8) / 0.9); r++) {
+          if (((bi * 7 + c * 3 + r * 5) % 4) === 0) continue;
+          bg.add(part(box, new T.MeshBasicMaterial({ color: ((bi + c + r) % 3) ? 0xffc77a : 0xffe2a8 }), bx + 0.5 + c * (w / cols), 1.0 + r * 0.9, -3.78, 0.34, 0.46, 0.02));
+        }
+        bx += w + 0.15 + ((bi * 11) % 5) * 0.12;
+        bi++;
+      }
+      scene.add(bg);
 
       /* ---------- 角色共用零件（角色朝 +x） ---------- */
       function addLegs(g, color, hipY, len, xs, z, pawMat) {
@@ -1792,6 +1873,7 @@
       refreshIcons();
       initReveal();
       initCounters();
+      initAmbience();
       initDogs();
     });
   </script>
