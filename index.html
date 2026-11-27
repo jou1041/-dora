@@ -38,6 +38,7 @@
 
   <!-- Lucide Icons CDN -->
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
   <style>
     body { font-family: 'Noto Sans TC', 'Inter', system-ui, sans-serif; background: #F8F2E7; color: #3B271C; }
@@ -117,24 +118,10 @@
     .thin-scroll::-webkit-scrollbar-thumb { background: #CDB89A; border-radius: 9px; }
 
 
-    /* ===== 人來人往動畫 ===== */
-    .crowd { position:absolute; left:0; right:0; bottom:0; height:200px; z-index:5; overflow:hidden; pointer-events:none;
-             border-bottom:0; background:linear-gradient(to top, rgba(217,112,43,.28), transparent); }
-    .crowd::after { content:""; position:absolute; left:0; right:0; bottom:10px; height:2px; background:rgba(248,242,231,.35); }
-    .walker { position:absolute; bottom:8px; left:0; will-change:transform; animation: walkAcross var(--dur,24s) linear var(--delay,0s) infinite; }
-    .walker.rtl { animation-name: walkAcrossRtl; }
-    .walker .bob { animation: bob .55s ease-in-out infinite; transform-origin:50% 100%; }
-    .walker.rtl .flip { transform: scaleX(-1); }
-    .walker .leg { transform-origin: 12px 30px; animation: stepA .55s ease-in-out infinite alternate; }
-    .walker .leg.b { animation-name: stepB; }
-    .walker .arm { transform-origin: 12px 17px; animation: stepB .55s ease-in-out infinite alternate; }
-    .walker .arm.b { animation-name: stepA; }
-    @keyframes walkAcross { from { transform: translateX(-12vw); } to { transform: translateX(112vw); } }
-    @keyframes walkAcrossRtl { from { transform: translateX(112vw); } to { transform: translateX(-12vw); } }
-    @keyframes bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-2px); } }
-    @keyframes stepA { from { transform: rotate(-26deg); } to { transform: rotate(26deg); } }
-    @keyframes stepB { from { transform: rotate(26deg); } to { transform: rotate(-26deg); } }
-    @media (prefers-reduced-motion: reduce) { .walker, .walker * { animation: none !important; } }
+    /* ===== 3D 小狗散步 ===== */
+    .dogs { position:absolute; left:0; right:0; bottom:0; height:200px; z-index:5; overflow:hidden; pointer-events:none;
+            background:linear-gradient(to top, rgba(217,112,43,.28), transparent); }
+    .dogs::after { content:""; position:absolute; left:0; right:0; bottom:6px; height:2px; background:rgba(248,242,231,.3); }
 
     @media (prefers-reduced-motion: reduce) {
       .reveal { opacity: 1; transform: none; transition: none; }
@@ -236,8 +223,8 @@
         </div>
       </div>
 
-      <!-- 人來人往動畫 -->
-      <div id="crowd" class="crowd" aria-hidden="true"></div>
+      <!-- 3D 小狗散步（Three.js） -->
+      <div id="dogs" class="dogs" aria-hidden="true"></div>
 
       <a href="#story" class="absolute bottom-24 left-1/2 z-10 hidden -translate-x-1/2 flex-col items-center gap-2 text-cream/60 transition hover:text-cream md:flex" aria-label="往下捲動">
         <span class="font-display text-xs tracking-[.4em]">SCROLL</span>
@@ -1438,39 +1425,142 @@
        11. 初始化
        ========================================================= */
 
-    /* 人來人往：隨機產生來往的行人 */
-    function initCrowd() {
-      const box = $('#crowd');
-      if (!box) return;
-      const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
-      const colors = ['#F8F2E7', '#D9702B', '#A98A72', '#E4D6BE', '#FBE7D6'];
-      const person = (c, skin) => `
-        <svg viewBox="0 0 24 40" width="100%" height="100%" class="flip">
-          <g class="bob">
-            <rect class="arm b" x="10.8" y="17" width="2.6" height="11" rx="1.3" fill="${c}" opacity=".7"/>
-            <rect class="leg b" x="10.6" y="29" width="3" height="11" rx="1.5" fill="${c}" opacity=".7"/>
-            <rect class="leg" x="10.6" y="29" width="3" height="11" rx="1.5" fill="${c}"/>
-            <rect x="7" y="14" width="10" height="16" rx="5" fill="${c}"/>
-            <circle cx="12" cy="8" r="5" fill="${skin}"/>
-            <rect class="arm" x="10.8" y="17" width="2.6" height="11" rx="1.3" fill="${c}"/>
-          </g>
-        </svg>`;
-      const N = window.innerWidth < 640 ? 9 : 16;
-      for (let i = 0; i < N; i++) {
-        const w = document.createElement('div');
-        const size = 80 + Math.random() * 50;
-        const rtl = i % 2 === 1;
-        w.className = 'walker' + (rtl ? ' rtl' : '');
-        w.style.width = size * 0.6 + 'px';
-        w.style.height = size + 'px';
-        w.style.bottom = 14 + Math.random() * 40 + 'px';
-        if (still) w.style.left = (4 + (i * 6.1) % 90) + '%';
-        w.style.opacity = (0.85 + Math.random() * 0.15).toFixed(2);
-        w.style.setProperty('--dur', (16 + Math.random() * 18).toFixed(1) + 's');
-        w.style.setProperty('--delay', (-Math.random() * 30).toFixed(1) + 's');
-        w.innerHTML = person(colors[i % colors.length], '#F3D3B0');
-        box.appendChild(w);
+    /* 3D 小狗散步：用 Three.js 以基本幾何組出可愛小狗，在首屏底部來回走 */
+    function initDogs() {
+      const host = $('#dogs');
+      if (!host || !window.THREE) return;
+      const T = THREE;
+      let renderer;
+      try { renderer = new T.WebGLRenderer({ alpha: true, antialias: true }); } catch (e) { return; }
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      host.appendChild(renderer.domElement);
+      renderer.domElement.style.cssText = 'display:block;width:100%;height:100%';
+
+      const scene = new T.Scene();
+      const camera = new T.PerspectiveCamera(28, 1, 0.1, 100);
+      camera.position.set(0, 2.4, 7.5);
+      camera.lookAt(0, 1.25, 0);
+      scene.add(new T.AmbientLight(0xffffff, 0.8));
+      const sun = new T.DirectionalLight(0xffffff, 0.8);
+      sun.position.set(3, 6, 5);
+      scene.add(sun);
+
+      const sph = new T.SphereGeometry(1, 24, 18);
+      const cyl = new T.CylinderGeometry(1, 1, 1, 12);
+      const mat = (c) => new T.MeshLambertMaterial({ color: c });
+      const part = (geo, m, x, y, z, sx, sy, sz) => {
+        const o = new T.Mesh(geo, m);
+        o.position.set(x, y, z);
+        o.scale.set(sx, sy, sz == null ? sx : sz);
+        return o;
+      };
+      const shade = (hex, k) => new T.Color(hex).multiplyScalar(k);
+      const dark = mat(0x2a1a12), pink = mat(0xff8fa3), shadowMat = new T.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.28, depthWrite: false });
+
+      // 朝 +x 的小狗：大圓頭、垂耳、短腿、搖尾巴
+      function makeDog(color, earColor, tongue) {
+        const m = mat(color), em = mat(earColor);
+        const g = new T.Group();
+        const body = part(sph, m, 0, 0.78, 0, 0.95, 0.58, 0.6);
+        g.add(body);
+        const head = new T.Group();
+        head.position.set(0.85, 1.25, 0);
+        head.add(part(sph, m, 0, 0, 0, 0.6));
+        head.add(part(sph, mat(shade(color, 1.12)), 0.5, -0.14, 0, 0.3, 0.24, 0.28));
+        head.add(part(sph, dark, 0.78, -0.05, 0, 0.1, 0.08, 0.1));
+        [0.27, -0.27].forEach((z) => { head.add(part(sph, dark, 0.46, 0.16, z, 0.1)); head.add(part(sph, mat(0xffffff), 0.54, 0.2, z * 0.92, 0.035)); });
+        const earL = part(sph, em, -0.02, 0.0, 0.5, 0.2, 0.4, 0.13); earL.rotation.x = -0.3; head.add(earL);
+        const earR = part(sph, em, -0.02, 0.0, -0.5, 0.2, 0.4, 0.13); earR.rotation.x = 0.3; head.add(earR);
+        if (tongue) head.add(part(sph, pink, 0.7, -0.3, 0, 0.1, 0.16, 0.08));
+        g.add(head);
+        const legs = [];
+        [[0.5, 0.26], [0.5, -0.26], [-0.5, 0.26], [-0.5, -0.26]].forEach(([x, z]) => {
+          const pv = new T.Group();
+          pv.position.set(x, 0.5, z);
+          pv.add(part(cyl, m, 0, -0.25, 0, 0.12, 0.5, 0.12));
+          pv.add(part(sph, mat(shade(color, 0.9)), 0.03, -0.5, 0, 0.15, 0.1, 0.15));
+          g.add(pv);
+          legs.push(pv);
+        });
+        const tail = new T.Group();
+        tail.position.set(-0.9, 0.95, 0);
+        const tm = part(cyl, m, 0, 0.28, 0, 0.07, 0.56, 0.07);
+        tail.add(tm);
+        tail.add(part(sph, m, 0, 0.58, 0, 0.1));
+        g.add(tail);
+        const sh = new T.Mesh(new T.CircleGeometry(1, 24), shadowMat);
+        sh.rotation.x = -Math.PI / 2;
+        sh.position.y = 0.02;
+        sh.scale.set(1.5, 0.7, 1);
+        g.add(sh);
+        return { g, head, legs, tail };
       }
+
+      const palette = [[0xe8b77a, 0xb97f45, true], [0xf6ecdc, 0xd9b48a, false], [0x9a6240, 0x6b3f26, true], [0xd9702b, 0xa8501a, true], [0xffffff, 0x8a6a52, false], [0xc9a27a, 0x8a5a36, false]];
+      const H = host.clientHeight || 200;
+      let halfW = 12;
+      const dogs = [];
+      const small = window.innerWidth < 640;
+      const count = small ? 4 : 7;
+      for (let i = 0; i < count; i++) {
+        const [c, e, tg] = palette[i % palette.length];
+        const d = makeDog(c, e, tg);
+        d.dir = i % 2 ? 1 : -1;
+        d.speed = 0.7 + Math.random() * 0.7;
+        d.phase = Math.random() * 6.28;
+        d.g.position.z = -1.1 + (2.2 * ((i * 3) % count)) / (count - 1);
+        d.g.rotation.y = d.dir > 0 ? 0 : Math.PI;
+        d.g.scale.setScalar(small ? 0.8 : 0.85 + Math.random() * 0.25);
+                scene.add(d.g);
+        dogs.push(d);
+      }
+
+      function resize() {
+        const w = host.clientWidth || window.innerWidth;
+        renderer.setSize(w, H, false);
+        camera.aspect = w / H;
+        camera.updateProjectionMatrix();
+        halfW = Math.tan((14 * Math.PI) / 180) * 7.5 * camera.aspect + 2.5;
+        dogs.forEach((d) => { d.g.position.x = Math.max(-halfW, Math.min(halfW, d.g.position.x)); });
+      }
+      resize();
+      dogs.forEach((d, i) => { d.g.position.x = -halfW + (2 * halfW * (i + Math.random() * 0.6)) / count; });
+      window.addEventListener('resize', resize);
+
+      function pose(d, t) {
+        const p = t * d.speed * 5 + d.phase;
+        const s = Math.sin(p) * 0.7;
+        d.legs[0].rotation.z = s; d.legs[3].rotation.z = s;
+        d.legs[1].rotation.z = -s; d.legs[2].rotation.z = -s;
+        d.g.children[0].position.y = 0.78 + Math.abs(Math.sin(p)) * 0.07;
+        d.head.position.y = 1.25 + Math.abs(Math.sin(p)) * 0.07;
+        d.head.rotation.z = Math.sin(p * 2) * 0.05;
+        d.tail.rotation.set(Math.sin(t * 12 + d.phase) * 0.55, 0, 0.9);
+      }
+
+      const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+      let running = true, last = performance.now(), t = 0;
+      function frame(now) {
+        requestAnimationFrame(frame);
+        const dt = Math.min((now - last) / 1000, 0.1);
+        last = now;
+        if (!running || document.hidden) return;
+        t += dt;
+        dogs.forEach((d) => {
+          d.g.position.x += d.dir * d.speed * dt;
+          if (d.dir > 0 && d.g.position.x > halfW) d.g.position.x = -halfW;
+          if (d.dir < 0 && d.g.position.x < -halfW) d.g.position.x = halfW;
+          pose(d, t);
+        });
+        renderer.render(scene, camera);
+      }
+      if (still) {
+        dogs.forEach((d) => pose(d, 0));
+        renderer.render(scene, camera);
+        return;
+      }
+      if ('IntersectionObserver' in window) new IntersectionObserver((en) => { running = en[0].isIntersecting; }).observe(host);
+      requestAnimationFrame(frame);
     }
 
     document.addEventListener('DOMContentLoaded', () => {
@@ -1488,7 +1578,7 @@
       refreshIcons();
       initReveal();
       initCounters();
-      initCrowd();
+      initDogs();
     });
   </script>
 </body>
