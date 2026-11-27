@@ -5,6 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>煎和鍋貼所 JIANHE｜金黃酥脆，傳承手藝的極致美味</title>
   <meta name="description" content="煎和鍋貼所：台灣在地豬肉、每日現包、黃金煎脆比例。線上點餐、冷凍禮盒宅配、門市據點資訊。" />
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.webmanifest" />
+  <meta name="theme-color" content="#3B271C" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="煎和鍋貼" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png" />
 
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -1950,6 +1960,12 @@
       if ('IntersectionObserver' in window) new IntersectionObserver((en) => { running = en[0].isIntersecting; }).observe(host);
       requestAnimationFrame(frame);
     }
+
+    /* PWA：註冊 Service Worker（需 https 或 localhost） */
+    if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+      window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+    }
+
 
     document.addEventListener('DOMContentLoaded', () => {
       $('#year').textContent = new Date().getFullYear();
